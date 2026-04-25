@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react'
 import Navbar from '../components/Navbar.jsx'
 import { StatusBadge } from '../components/Spinner.jsx'
 
+const DISCONNECT_KEYWORDS = ['connection closed', 'disconnected', 'unauthorized', 'session', 'logout']
+function isDisconnectError(msg) {
+  if (!msg) return false
+  const lower = msg.toLowerCase()
+  return DISCONNECT_KEYWORDS.some(k => lower.includes(k))
+}
+
 export default function ReportScreen({ onNavigate, apiFetch, campaignId }) {
   const [report, setReport] = useState(null)
   const [filter, setFilter] = useState('all')
@@ -87,7 +94,13 @@ export default function ReportScreen({ onNavigate, apiFetch, campaignId }) {
                     <td>{r.phone}</td>
                     <td><StatusBadge status={r.status} /></td>
                     <td>{r.sent_at ? formatDate(r.sent_at) : '—'}</td>
-                    <td className="text-error">{r.error_message || ''}</td>
+                    <td className="text-error">
+                      {r.error_message
+                        ? isDisconnectError(r.error_message)
+                          ? 'WhatsApp disconnected during send'
+                          : r.error_message
+                        : ''}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -18,6 +18,24 @@ export default function LoginScreen({ onNavigate, apiFetch }) {
   const [regPassword, setRegPassword] = useState('')
   const [regConfirm, setRegConfirm] = useState('')
 
+  async function checkInstanceAndNavigate() {
+    // Small delay to ensure localStorage is readable by apiFetch
+    await new Promise(resolve => setTimeout(resolve, 100))
+    try {
+      const instanceRes = await apiFetch('/api/instance/mine')
+      if (!instanceRes || !instanceRes.ok) { onNavigate('setup'); return }
+      const instanceData = await instanceRes.json()
+      if (instanceData && instanceData.instance_name) {
+        localStorage.setItem(STORAGE_INSTANCE, instanceData.instance_name)
+        onNavigate('dashboard')
+      } else {
+        onNavigate('setup')
+      }
+    } catch {
+      onNavigate('setup')
+    }
+  }
+
   async function handleLogin(e) {
     e.preventDefault()
     setError('')
@@ -31,11 +49,7 @@ export default function LoginScreen({ onNavigate, apiFetch }) {
       if (!res.ok) throw new Error(data.detail || 'Login failed')
       localStorage.setItem(STORAGE_TOKEN, data.token)
       localStorage.setItem(STORAGE_USER, JSON.stringify({ email: loginEmail, user_id: data.user_id }))
-      if (localStorage.getItem(STORAGE_INSTANCE)) {
-        onNavigate('dashboard')
-      } else {
-        onNavigate('setup')
-      }
+      await checkInstanceAndNavigate()
     } catch (e) {
       setError(e.message)
     } finally {
@@ -58,6 +72,7 @@ export default function LoginScreen({ onNavigate, apiFetch }) {
       if (!res.ok) throw new Error(data.detail || 'Registration failed')
       localStorage.setItem(STORAGE_TOKEN, data.token)
       localStorage.setItem(STORAGE_USER, JSON.stringify({ email: regEmail, branch: regBranch, user_id: data.user_id }))
+      // New users never have an instance yet
       onNavigate('setup')
     } catch (e) {
       setError(e.message)

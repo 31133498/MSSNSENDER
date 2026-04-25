@@ -276,6 +276,49 @@ html, body {
 .progress-stats { font-size: 14px; color: var(--text-muted); }
 .checkmark { width: 64px; height: 64px; border-radius: 50%; background: var(--green); color: #fff; font-size: 32px; display: flex; align-items: center; justify-content: center; }
 
+/* ── Disconnect banner ── */
+.disconnect-banner {
+  background: #fef3e2;
+  border: 1px solid #f5d5a0;
+  border-left: 4px solid var(--amber);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 14px;
+  color: #a05a00;
+  flex-wrap: wrap;
+}
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+.modal-card {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 36px 32px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+}
+.modal-icon { font-size: 40px; }
+.modal-title { font-size: 20px; font-weight: 600; }
+.modal-body { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.modal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+
 /* ── Report ── */
 .summary-card-report { display: flex; flex-direction: column; gap: 0; }
 .report-table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; flex-wrap: wrap; gap: 10px; }

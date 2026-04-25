@@ -34,6 +34,7 @@ async function apiFetch(path, options = {}) {
 export default function App() {
   const [screen, setScreen] = useState('loading')
   const [screenParams, setScreenParams] = useState({})
+  const [isConnected, setIsConnected] = useState(null) // null=checking, true=open, false=closed
 
   function navigate(name, params = {}) {
     setScreenParams(params)
@@ -48,21 +49,25 @@ export default function App() {
       .then(r => { if (!r) return; return r.json() })
       .then(async data => {
         if (!data || !data.instance_name) {
-          setScreen('setup'); return
+          // No instance at all — brand new user, go to setup
+          setScreen('setup')
+          return
         }
+
+        // Instance exists — save it and go to dashboard
         localStorage.setItem(STORAGE_INSTANCE, data.instance_name)
+
+        // Check live connection status but NEVER block dashboard access
         try {
           const statusRes = await apiFetch(`/api/instance/status?instance=${encodeURIComponent(data.instance_name)}`)
           const statusData = await statusRes.json()
           const state = statusData?.instance?.state || statusData?.state
-          if (state === 'open') {
-            setScreen('dashboard')
-          } else {
-            setScreen('reconnect')
-          }
+          setIsConnected(state === 'open')
         } catch {
-          setScreen('dashboard')
+          setIsConnected(false)
         }
+
+        setScreen('dashboard')
       })
       .catch(() => setScreen('login'))
   }, [])
@@ -80,7 +85,7 @@ export default function App() {
   if (screen === 'login') return <LoginScreen {...props} />
   if (screen === 'setup') return <SetupScreen {...props} isReconnect={false} />
   if (screen === 'reconnect') return <SetupScreen {...props} isReconnect={true} />
-  if (screen === 'dashboard') return <DashboardScreen {...props} />
+  if (screen === 'dashboard') return <DashboardScreen {...props} isConnected={isConnected} setIsConnected={setIsConnected} />
   if (screen === 'contacts') return <ContactsScreen {...props} />
   if (screen === 'campaign') return <CampaignScreen {...props} />
   if (screen === 'progress') return <ProgressScreen {...props} campaignId={screenParams.campaignId} />

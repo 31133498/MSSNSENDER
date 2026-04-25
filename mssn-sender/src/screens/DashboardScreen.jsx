@@ -2,15 +2,32 @@ import { useState, useEffect } from 'react'
 import Navbar from '../components/Navbar.jsx'
 import { StatusBadge } from '../components/Spinner.jsx'
 
-export default function DashboardScreen({ onNavigate, apiFetch }) {
+export default function DashboardScreen({ onNavigate, apiFetch, isConnected, setIsConnected }) {
   const [stats, setStats] = useState({ contacts: 0, campaigns: 0, delivered: 0, failed: 0 })
   const [campaigns, setCampaigns] = useState([])
   const user = JSON.parse(localStorage.getItem('mssn_user') || '{}')
+  const instance = localStorage.getItem('mssn_instance') || ''
+
+  function checkConnection() {
+    if (!instance) return
+    apiFetch(`/api/instance/status?instance=${encodeURIComponent(instance)}`)
+      .then(r => r && r.json())
+      .then(data => {
+        const state = data?.instance?.state || data?.state
+        setIsConnected(state === 'open')
+      })
+      .catch(() => setIsConnected(false))
+  }
 
   useEffect(() => {
     apiFetch('/api/stats').then(r => r && r.ok && r.json().then(d => setStats(d))).catch(() => {})
     apiFetch('/api/campaigns').then(r => r && r.ok && r.json().then(d => setCampaigns(d))).catch(() => {})
-  }, []) // re-runs every time dashboard mounts
+    // Check connection on mount if not already known
+    if (isConnected === null) checkConnection()
+    // Poll every 30 seconds
+    const interval = setInterval(checkConnection, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   function formatDate(s) {
     if (!s) return '—'
@@ -19,8 +36,19 @@ export default function DashboardScreen({ onNavigate, apiFetch }) {
 
   return (
     <div className="screen">
-      <Navbar onNavigate={onNavigate} />
+      <Navbar onNavigate={onNavigate} apiFetch={apiFetch} isConnected={isConnected} />
       <div className="page-body">
+
+        {/* Disconnection warning banner */}
+        {isConnected === false && (
+          <div className="disconnect-banner">
+            <span>⚠️ Your WhatsApp is disconnected. You cannot send messages until you reconnect.</span>
+            <button className="btn btn-sm btn-primary" onClick={() => onNavigate('reconnect')}>
+              Reconnect Now →
+            </button>
+          </div>
+        )}
+
         <div className="page-header">
           <div>
             <h1 className="page-title">Dashboard</h1>
