@@ -1,0 +1,13 @@
+# Python
+mssn-backend/venv/
+mssn-backend/__pycache__/
+mssn-backend/*.pyc
+mssn-backend/.env
+
+# Node
+mssn-sender/node_modules/
+mssn-sender/dist/
+
+# OS
+.DS_Store
+Thumbs.db
