@@ -6,6 +6,7 @@ import ContactsScreen from './screens/ContactsScreen.jsx'
 import CampaignScreen from './screens/CampaignScreen.jsx'
 import ProgressScreen from './screens/ProgressScreen.jsx'
 import ReportScreen from './screens/ReportScreen.jsx'
+import LandingScreen from './screens/LandingScreen.jsx'
 
 const STORAGE_TOKEN = 'mssn_token'
 const STORAGE_INSTANCE = 'mssn_instance'
@@ -45,7 +46,7 @@ export default function App() {
 
   useEffect(() => {
     const token = localStorage.getItem(STORAGE_TOKEN)
-    if (!token) { setScreen('login'); return }
+    if (!token) { setScreen('landing'); return }
 
     apiFetch('/api/instance/mine')
       .then(r => { if (!r) return; return r.json() })
@@ -84,6 +85,7 @@ export default function App() {
 
   const props = { onNavigate: navigate, apiFetch }
 
+  if (screen === 'landing') return <LandingScreen onNavigate={navigate} />
   if (screen === 'login') return <LoginScreen {...props} />
   if (screen === 'setup') return <SetupScreen {...props} isReconnect={false} />
   if (screen === 'reconnect') return <SetupScreen {...props} isReconnect={true} />
