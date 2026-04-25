@@ -170,22 +170,34 @@ async def instance_status(instance: str = Query(...), user_id: str = Depends(get
 @app.get("/api/instance/connect")
 async def instance_connect(instance: str = Query(...), user_id: str = Depends(get_current_user)):
     try:
+        # Step 1 — try to create the instance
         create_res = await http_client.post(
             f"{EVOLUTION_API_URL}/instance/create",
             headers=EVO_GLOBAL_HEADERS,
             json={"instanceName": instance, "qrcode": True, "integration": "WHATSAPP-BAILEYS"})
-        if create_res.status_code not in (200, 201, 409):
-            print(f"[ERROR] /api/instance/connect create: {create_res.text}")
+
+        if create_res.status_code in (200, 201):
+            # New instance created — fall through to fetch QR
+            pass
+        elif create_res.status_code in (403, 409):
+            # Instance already exists — skip creation, go straight to QR
+            pass
+        else:
+            print(f"[ERROR] /api/instance/connect create: {create_res.status_code} {create_res.text}")
             raise HTTPException(status_code=502, detail="Failed to create instance")
 
+        # Step 2 — fetch QR for new or existing instance
         qr_res = await http_client.get(
             f"{EVOLUTION_API_URL}/instance/connect/{instance}",
             headers=EVO_GLOBAL_HEADERS)
         if qr_res.status_code != 200:
-            print(f"[ERROR] /api/instance/connect qr: {qr_res.text}")
+            print(f"[ERROR] /api/instance/connect qr: {qr_res.status_code} {qr_res.text}")
             raise HTTPException(status_code=502, detail="Failed to fetch QR code")
 
         return qr_res.json()
+
+    except HTTPException:
+        raise
     except (httpx.ConnectError, httpx.TimeoutException) as e:
         print(f"[ERROR] /api/instance/connect: {e}")
         raise HTTPException(status_code=503, detail="Cannot reach Evolution API")
