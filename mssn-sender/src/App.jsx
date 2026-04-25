@@ -45,34 +45,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    const token = localStorage.getItem(STORAGE_TOKEN)
-    if (!token) { setScreen('landing'); return }
-
-    apiFetch('/api/instance/mine')
-      .then(r => { if (!r) return; return r.json() })
-      .then(async data => {
-        if (!data || !data.instance_name) {
-          // No instance at all — brand new user, go to setup
-          setScreen('setup')
-          return
-        }
-
-        // Instance exists — save it and go to dashboard
-        localStorage.setItem(STORAGE_INSTANCE, data.instance_name)
-
-        // Check live connection status but NEVER block dashboard access
-        try {
-          const statusRes = await apiFetch(`/api/instance/status?instance=${encodeURIComponent(data.instance_name)}`)
-          const statusData = await statusRes.json()
-          const state = statusData?.instance?.state || statusData?.state
-          setIsConnected(state === 'open')
-        } catch {
-          setIsConnected(false)
-        }
-
-        setScreen('dashboard')
-      })
-      .catch(() => setScreen('login'))
+    setScreen('landing')
   }, [])
 
   if (screen === 'loading') {
