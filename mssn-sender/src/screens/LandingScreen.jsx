@@ -77,6 +77,27 @@ export default function LandingScreen({ onNavigate }) {
   const goLogin    = () => onNavigate('login', { tab: 'login' })
   const goRegister = () => onNavigate('login', { tab: 'register' })
 
+  async function handleSignIn() {
+    const token = localStorage.getItem('mssn_token')
+    if (!token) { onNavigate('login', { tab: 'login' }); return }
+    // Returning user — auto login silently
+    try {
+      const res = await fetch('https://api.zaicondigital.com/api/instance/mine', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (res.status === 401) { localStorage.clear(); onNavigate('login', { tab: 'login' }); return }
+      const data = await res.json()
+      if (data && data.instance_name) {
+        localStorage.setItem('mssn_instance', data.instance_name)
+        onNavigate('dashboard')
+      } else {
+        onNavigate('setup')
+      }
+    } catch {
+      onNavigate('login', { tab: 'login' })
+    }
+  }
+
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", background: '#fff', color: '#0a0a0a', overflowX: 'hidden' }}>
 
@@ -94,7 +115,7 @@ export default function LandingScreen({ onNavigate }) {
         </div>
 
         <div className="lp-nav-actions" style={{ display: 'flex', gap: 10 }}>
-          <button onClick={goLogin} style={{ fontSize: 14, fontWeight: 500, cursor: 'pointer', padding: '8px 16px', borderRadius: 8, border: '0.5px solid #d0d0cc', background: 'transparent', color: '#0a0a0a' }}>Sign in</button>
+          <button onClick={handleSignIn} style={{ fontSize: 14, fontWeight: 500, cursor: 'pointer', padding: '8px 16px', borderRadius: 8, border: '0.5px solid #d0d0cc', background: 'transparent', color: '#0a0a0a' }}>Sign in</button>
           <button onClick={goRegister} style={{ fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: '8px 18px', borderRadius: 8, background: '#0a0a0a', color: '#fff', border: 'none' }}>Get started free</button>
         </div>
 
@@ -108,7 +129,7 @@ export default function LandingScreen({ onNavigate }) {
           {[['#features','Features'],['#how-it-works','How it works'],['#pricing','Pricing']].map(([href, label]) => (
             <a key={href} href={href} onClick={() => setMenuOpen(false)} style={{ fontSize: 15, color: '#0a0a0a', textDecoration: 'none', fontWeight: 500 }}>{label}</a>
           ))}
-          <button onClick={goLogin} style={{ fontSize: 14, fontWeight: 500, padding: '10px', borderRadius: 8, border: '0.5px solid #d0d0cc', background: 'transparent', cursor: 'pointer' }}>Sign in</button>
+          <button onClick={handleSignIn} style={{ fontSize: 14, fontWeight: 500, padding: '10px', borderRadius: 8, border: '0.5px solid #d0d0cc', background: 'transparent', cursor: 'pointer' }}>Sign in</button>
           <button onClick={goRegister} style={{ fontSize: 14, fontWeight: 600, padding: '10px', borderRadius: 8, background: '#0a0a0a', color: '#fff', border: 'none', cursor: 'pointer' }}>Get started free</button>
         </div>
       )}

@@ -45,23 +45,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    const token = localStorage.getItem(STORAGE_TOKEN)
-    if (!token) { setScreen('landing'); return }
-    // Existing user — auto login, skip landing
-    apiFetch('/api/instance/mine')
-      .then(r => { if (!r) return; return r.json() })
-      .then(async data => {
-        if (!data || !data.instance_name) { setScreen('setup'); return }
-        localStorage.setItem(STORAGE_INSTANCE, data.instance_name)
-        try {
-          const statusRes = await apiFetch(`/api/instance/status?instance=${encodeURIComponent(data.instance_name)}`)
-          const statusData = await statusRes.json()
-          const state = statusData?.instance?.state || statusData?.state
-          setIsConnected(state === 'open')
-        } catch { setIsConnected(false) }
-        setScreen('dashboard')
-      })
-      .catch(() => setScreen('landing'))
+    setScreen('landing')
   }, [])
 
   if (screen === 'loading') {
