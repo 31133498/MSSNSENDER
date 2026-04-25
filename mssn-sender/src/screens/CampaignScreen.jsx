@@ -156,8 +156,10 @@ export default function CampaignScreen({ onNavigate, apiFetch }) {
 
   const recipientList = [...recipients.values()]
   const firstRecipient = recipientList[0]
+  // Use first recipient that has a name for preview, fallback to first
+  const previewRecipient = recipientList.find(r => r.name) || firstRecipient
   const previewMsg = message
-    .replace(/\{\{name\}\}/g, firstRecipient?.name || 'member')
+    .replace(/\{\{name\}\}/g, previewRecipient?.name || 'member')
   const estMins = Math.ceil(recipientList.length * 4 / 60)
 
   async function handleSend() {
@@ -365,7 +367,7 @@ export default function CampaignScreen({ onNavigate, apiFetch }) {
                 {previewMsg || <span className="text-muted">Your message will appear here…</span>}
               </div>
               {firstRecipient && (
-                <p className="preview-sub">For: {firstRecipient.phone}</p>
+                <p className="preview-sub">For: {previewRecipient?.name || firstRecipient.phone}</p>
               )}
             </div>
           </div>

@@ -557,11 +557,11 @@ async def run_campaign(campaign_id: str, instance_name: str, message_template: s
         phone        = r.get("phone", "")
         personalized = message_template.replace("{{name}}", name)
 
-        async def attempt_send():
+        async def attempt_send(msg=personalized, num=phone):
             return await http_client.post(
                 f"{EVOLUTION_API_URL}/message/sendText/{instance_name}",
                 headers=EVO_HEADERS,
-                json={"number": phone, "text": personalized})
+                json={"number": num, "text": msg})
 
         try:
             send_res = await attempt_send()
@@ -570,7 +570,7 @@ async def run_campaign(campaign_id: str, instance_name: str, message_template: s
             if send_res.status_code == 429:
                 print(f"[WARN] Rate limited on {phone}. Pausing 5 minutes.")
                 await asyncio.sleep(300)
-                send_res = await attempt_send()
+                send_res = await attempt_send(personalized, phone)
 
             if send_res.status_code in (200, 201):
                 supabase.table("campaign_recipients").update({
