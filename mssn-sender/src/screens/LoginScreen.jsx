@@ -85,11 +85,16 @@ export default function LoginScreen({ onNavigate, apiFetch, screenParams = {} })
     <div className="login-page">
       <div className="login-left">
         <div className="crescent-wrap">
-          <div className="crescent" />
+          <svg width="56" height="56" viewBox="0 0 32 32" fill="none">
+            <rect x="2" y="2" width="12" height="12" rx="3" fill="#fff"/>
+            <rect x="18" y="2" width="12" height="12" rx="3" fill="#fff" opacity="0.5"/>
+            <rect x="2" y="18" width="12" height="12" rx="3" fill="#fff" opacity="0.3"/>
+            <rect x="18" y="18" width="12" height="12" rx="3" fill="#fff" opacity="0.15"/>
+          </svg>
         </div>
-        <h1 className="login-brand">MSSN Sender</h1>
-        <p className="login-sub">Official WhatsApp Broadcast Tool</p>
-        <p className="login-org">Muslim Students' Society of Nigeria</p>
+        <h1 className="login-brand">BulkIt</h1>
+        <p className="login-sub">WhatsApp Broadcast Tool for Organizations</p>
+        <p className="login-org">bulkit-beta.vercel.app</p>
       </div>
 
       <div className="login-right">
@@ -109,7 +114,7 @@ export default function LoginScreen({ onNavigate, apiFetch, screenParams = {} })
             <form onSubmit={handleLogin} className="auth-form">
               <label className="field-label">Email</label>
               <input className="input" type="email" required value={loginEmail}
-                onChange={e => setLoginEmail(e.target.value)} placeholder="admin@mssn-unilag.com" />
+                onChange={e => setLoginEmail(e.target.value)} placeholder="admin@yourorg.com" />
               <label className="field-label">Password</label>
               <input className="input" type="password" required value={loginPassword}
                 onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" />
@@ -122,10 +127,10 @@ export default function LoginScreen({ onNavigate, apiFetch, screenParams = {} })
             <form onSubmit={handleRegister} className="auth-form">
               <label className="field-label">Branch Name</label>
               <input className="input" type="text" required value={regBranch}
-                onChange={e => setRegBranch(e.target.value)} placeholder="e.g. MSSN Unilag" />
+                onChange={e => setRegBranch(e.target.value)} placeholder="e.g. Student Union, Campus Mosque" />
               <label className="field-label">Email</label>
               <input className="input" type="email" required value={regEmail}
-                onChange={e => setRegEmail(e.target.value)} placeholder="admin@mssn-unilag.com" />
+                onChange={e => setRegEmail(e.target.value)} placeholder="admin@yourorg.com" />
               <label className="field-label">Password</label>
               <input className="input" type="password" required value={regPassword}
                 onChange={e => setRegPassword(e.target.value)} placeholder="Min 8 characters" />

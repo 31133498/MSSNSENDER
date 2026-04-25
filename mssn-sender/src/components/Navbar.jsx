@@ -15,7 +15,7 @@ export default function Navbar({ onNavigate, apiFetch, isConnected }) {
 
   return (
     <nav className="navbar">
-      <span className="navbar-brand" onClick={() => onNavigate('dashboard')}>MSSN Sender</span>
+      <span className="navbar-brand" onClick={() => onNavigate('dashboard')}>BulkIt</span>
 
       <div className="navbar-center">
         {isConnected === false ? (

@@ -19,7 +19,7 @@ export default function SetupScreen({ onNavigate, apiFetch, isReconnect = false 
   const instanceNameRef = useRef(
     isReconnect && existingInstance
       ? existingInstance
-      : generateInstanceName(user.email || 'mssn')
+      : generateInstanceName(user.email || 'bulkit')
   )
 
   const [qrSrc, setQrSrc] = useState(null)
