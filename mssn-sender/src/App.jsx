@@ -10,11 +10,12 @@ import ReportScreen from './screens/ReportScreen.jsx'
 const STORAGE_TOKEN = 'mssn_token'
 const STORAGE_INSTANCE = 'mssn_instance'
 const STORAGE_USER = 'mssn_user'
+const API_BASE = 'https://api.zaicondigital.com'
 
 async function apiFetch(path, options = {}) {
   const token = localStorage.getItem(STORAGE_TOKEN)
   const isFormData = options.body instanceof FormData
-  const res = await fetch(path, {
+  const res = await fetch(API_BASE + path, {
     ...options,
     headers: {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
@@ -22,7 +23,6 @@ async function apiFetch(path, options = {}) {
       ...(options.headers || {})
     }
   })
-  // Only force logout on 401 for protected routes, not auth endpoints
   if (res.status === 401 && !path.includes('/api/auth/')) {
     localStorage.clear()
     window.location.reload()
@@ -50,7 +50,6 @@ export default function App() {
         if (!data || !data.instance_name) {
           setScreen('setup'); return
         }
-        // Instance exists in DB — now check if it's actually connected
         localStorage.setItem(STORAGE_INSTANCE, data.instance_name)
         try {
           const statusRes = await apiFetch(`/api/instance/status?instance=${encodeURIComponent(data.instance_name)}`)
@@ -59,11 +58,9 @@ export default function App() {
           if (state === 'open') {
             setScreen('dashboard')
           } else {
-            // Instance exists but disconnected — go to reconnect screen
             setScreen('reconnect')
           }
         } catch {
-          // Can't reach Evolution API — still show dashboard, let user try
           setScreen('dashboard')
         }
       })

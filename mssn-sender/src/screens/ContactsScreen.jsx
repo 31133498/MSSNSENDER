@@ -53,7 +53,7 @@ export default function ContactsScreen({ onNavigate, apiFetch }) {
     const form = new FormData()
     form.append('file', csvFile)
     const token = localStorage.getItem('mssn_token')
-    const res = await fetch('/api/contacts/upload', {
+    const res = await fetch('https://api.zaicondigital.com/api/contacts/upload', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: form
