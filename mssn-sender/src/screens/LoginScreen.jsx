@@ -5,8 +5,8 @@ const STORAGE_TOKEN = 'mssn_token'
 const STORAGE_USER = 'mssn_user'
 const STORAGE_INSTANCE = 'mssn_instance'
 
-export default function LoginScreen({ onNavigate, apiFetch }) {
-  const [tab, setTab] = useState('login')
+export default function LoginScreen({ onNavigate, apiFetch, screenParams = {} }) {
+  const [tab, setTab] = useState(screenParams.tab || 'login')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 

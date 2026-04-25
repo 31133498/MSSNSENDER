@@ -45,7 +45,23 @@ export default function App() {
   }
 
   useEffect(() => {
-    setScreen('landing')
+    const token = localStorage.getItem(STORAGE_TOKEN)
+    if (!token) { setScreen('landing'); return }
+    // Existing user — auto login, skip landing
+    apiFetch('/api/instance/mine')
+      .then(r => { if (!r) return; return r.json() })
+      .then(async data => {
+        if (!data || !data.instance_name) { setScreen('setup'); return }
+        localStorage.setItem(STORAGE_INSTANCE, data.instance_name)
+        try {
+          const statusRes = await apiFetch(`/api/instance/status?instance=${encodeURIComponent(data.instance_name)}`)
+          const statusData = await statusRes.json()
+          const state = statusData?.instance?.state || statusData?.state
+          setIsConnected(state === 'open')
+        } catch { setIsConnected(false) }
+        setScreen('dashboard')
+      })
+      .catch(() => setScreen('landing'))
   }, [])
 
   if (screen === 'loading') {
@@ -59,7 +75,7 @@ export default function App() {
   const props = { onNavigate: navigate, apiFetch }
 
   if (screen === 'landing') return <LandingScreen onNavigate={navigate} />
-  if (screen === 'login') return <LoginScreen {...props} />
+  if (screen === 'login') return <LoginScreen {...props} screenParams={screenParams} />
   if (screen === 'setup') return <SetupScreen {...props} isReconnect={false} />
   if (screen === 'reconnect') return <SetupScreen {...props} isReconnect={true} />
   if (screen === 'dashboard') return <DashboardScreen {...props} isConnected={isConnected} setIsConnected={setIsConnected} />
