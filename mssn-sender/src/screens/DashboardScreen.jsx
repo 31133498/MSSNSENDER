@@ -22,9 +22,8 @@ export default function DashboardScreen({ onNavigate, apiFetch, isConnected, set
   useEffect(() => {
     apiFetch('/api/stats').then(r => r && r.ok && r.json().then(d => setStats(d))).catch(() => {})
     apiFetch('/api/campaigns').then(r => r && r.ok && r.json().then(d => setCampaigns(d))).catch(() => {})
-    // Check connection on mount if not already known
-    if (isConnected === null) checkConnection()
-    // Poll every 30 seconds
+    // Always check connection on mount
+    checkConnection()
     const interval = setInterval(checkConnection, 30000)
     return () => clearInterval(interval)
   }, [])

@@ -38,6 +38,8 @@ export default function App() {
 
   function navigate(name, params = {}) {
     setScreenParams(params)
+    // When navigating to dashboard, reset connection state so it re-checks
+    if (name === 'dashboard') setIsConnected(null)
     setScreen(name)
   }
 
