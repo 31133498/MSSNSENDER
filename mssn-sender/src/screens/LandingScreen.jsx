@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { API_BASE } from '../api.js'
 
 function AnimatedNumber({ target, suffix = '' }) {
   const [display, setDisplay] = useState(0)
@@ -82,7 +83,7 @@ export default function LandingScreen({ onNavigate }) {
     if (!token) { onNavigate('login', { tab: 'login' }); return }
     // Returning user — auto login silently
     try {
-      const res = await fetch('https://api.zaicondigital.com/api/instance/mine', {
+      const res = await fetch(API_BASE + '/api/instance/mine', {
         headers: { Authorization: `Bearer ${token}` }
       })
       if (res.status === 401) { localStorage.clear(); onNavigate('login', { tab: 'login' }); return }

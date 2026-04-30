@@ -126,6 +126,7 @@ async def register(body: AuthBody):
             "email": body.email,
             "password_hash": hashed,
             "branch_name": body.branch_name or "",
+            "created_at": datetime.now(timezone.utc).isoformat()
         }).execute()
     except Exception as e:
         print(f"[ERROR] /api/auth/register insert: {e}")
@@ -238,11 +239,53 @@ async def instance_mine(user_id: str = Depends(get_current_user)):
 @app.post("/api/contacts/upload")
 async def contacts_upload(file: UploadFile = File(...), user_id: str = Depends(get_current_user)):
     content = await file.read()
-    reader  = csv.DictReader(io.StringIO(content.decode("utf-8-sig")))
+    decoded_content = content.decode("utf-8-sig")
+    reader  = csv.DictReader(io.StringIO(decoded_content))
     to_insert, rejected = [], []
-
+    
+    # Get all column headers from CSV
+    fieldnames = reader.fieldnames or []
+    detected_columns = [f.strip() for f in fieldnames]
+    
+    # Normalize column mapping
+    phone_col = None
+    name_col = None
+    group_col = None
+    custom_field_cols = []
+    
+    # 1. CONTENT-BASED DETECTION for Phone column (High Priority)
+    # Scan first 10 rows to see which column most frequently contains valid phone numbers
+    column_scores = {col: 0 for col in detected_columns}
     for i, row in enumerate(reader):
-        raw_phone = (row.get("phone") or row.get("Phone") or "").strip()
+        if i >= 10: break
+        for col in detected_columns:
+            if format_phone(row.get(col, "")):
+                column_scores[col] += 1
+    
+    if any(column_scores.values()):
+        phone_col = max(column_scores, key=column_scores.get)
+
+    # 2. NAME-BASED DETECTION for other columns and fallback for Phone
+    for col in detected_columns:
+        col_lower = col.lower()
+        if not phone_col and col_lower in ("phone", "phonenumber", "phone_number", "tel", "telephone", "mobile"):
+            phone_col = col
+        elif col == phone_col:
+            continue
+        elif col_lower in ("name", "fullname", "full_name", "contact_name", "contactname"):
+            name_col = col
+        elif col_lower in ("group", "groupname", "group_name", "grp"):
+            group_col = col
+        else:
+            custom_field_cols.append(col)
+    
+    if not phone_col:
+        raise HTTPException(status_code=400, detail="Could not identify a phone number column by content or header name.")
+
+    # Reset reader to start for final processing
+    reader = csv.DictReader(io.StringIO(decoded_content))
+    for i, row in enumerate(reader):
+        raw_phone = (row.get(phone_col) or "").strip()
         if not raw_phone:
             rejected.append({"row": i + 2, "reason": "Missing phone field"})
             continue
@@ -250,11 +293,22 @@ async def contacts_upload(file: UploadFile = File(...), user_id: str = Depends(g
         if not formatted:
             rejected.append({"row": i + 2, "reason": f"Invalid phone: {raw_phone}"})
             continue
+        
+        # Build custom_fields from all other columns
+        custom_fields = {}
+        for col in custom_field_cols:
+            val = (row.get(col) or "").strip()
+            if val:
+                # Use normalized field name
+                field_key = col.lower().replace(" ", "_").replace("-", "_")
+                custom_fields[field_key] = val
+        
         to_insert.append({
-            "user_id":    user_id,
-            "name":       (row.get("name") or row.get("Name") or "").strip() or None,
-            "phone":      formatted,
-            "group_name": (row.get("group") or row.get("Group") or "").strip() or None,
+            "user_id":      user_id,
+            "name":         (row.get(name_col) or row.get(name_col.title()) or "").strip() or None if name_col else None,
+            "phone":        formatted,
+            "group_name":   (row.get(group_col) or row.get(group_col.title()) or "").strip() or None if group_col else None,
+            "custom_fields": custom_fields,
         })
 
     if to_insert:
@@ -264,11 +318,20 @@ async def contacts_upload(file: UploadFile = File(...), user_id: str = Depends(g
             print(f"[ERROR] /api/contacts/upload: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    return {"inserted": len(to_insert), "rejected": rejected}
+    # Return detected columns for frontend mapping
+    return_columns = [name_col] if name_col else []
+    return_columns.extend([c for c in custom_field_cols])
+    
+    return {
+        "inserted": len(to_insert), 
+        "rejected": rejected,
+        "columns": [c for c in detected_columns if c.lower() != phone_col.lower()]
+    }
 
 
 class PasteBody(BaseModel):
-    text: str
+    text:       str
+    group_name: Optional[str] = None
 
 
 @app.post("/api/contacts/paste")
@@ -284,7 +347,7 @@ async def contacts_paste(body: PasteBody, user_id: str = Depends(get_current_use
         if not formatted:
             rejected.append({"raw": raw, "reason": f"Invalid phone: {raw}"})
             continue
-        to_insert.append({"user_id": user_id, "name": None, "phone": formatted, "group_name": None})
+        to_insert.append({"user_id": user_id, "name": None, "phone": formatted, "group_name": body.group_name or None, "custom_fields": {}})
 
     if to_insert:
         try:
@@ -297,9 +360,10 @@ async def contacts_paste(body: PasteBody, user_id: str = Depends(get_current_use
 
 
 class SingleContactBody(BaseModel):
-    name:  Optional[str] = None
-    phone: str
-    group: Optional[str] = None
+    name:         Optional[str]      = None
+    phone:        str
+    group_name:   Optional[str]      = None
+    custom_fields: Optional[dict]   = {}
 
 
 @app.post("/api/contacts")
@@ -308,40 +372,75 @@ async def contacts_add(body: SingleContactBody, user_id: str = Depends(get_curre
     if not formatted:
         raise HTTPException(status_code=400, detail="Invalid phone number")
     try:
-        supabase.table("contacts").insert({
-            "user_id":    user_id,
-            "name":       body.name or None,
-            "phone":      formatted,
-            "group_name": body.group or None,
+        result = supabase.table("contacts").insert({
+            "user_id":      user_id,
+            "name":         body.name or None,
+            "phone":        formatted,
+            "group_name":   body.group_name or None,
+            "custom_fields": body.custom_fields or {},
         }).execute()
     except Exception as e:
         print(f"[ERROR] /api/contacts add: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    return {"success": True}
+    return {"success": True, "contact": result.data[0] if result.data else {}}
 
 
 @app.get("/api/contacts")
 async def contacts_list(
-    group:  Optional[str] = Query(None),
-    search: Optional[str] = Query(None),
-    user_id: str = Depends(get_current_user),
+    group:    Optional[str] = Query(None),
+    search:   Optional[str] = Query(None),
+    page:     int           = Query(1),
+    per_page: int           = Query(50),
+    user_id:  str           = Depends(get_current_user),
 ):
     try:
-        q = supabase.table("contacts").select("*").eq("user_id", user_id)
-        if group:
+        q = supabase.table("contacts").select("*", count="exact").eq("user_id", user_id)
+        if group == "__ungrouped__":
+            q = q.is_("group_name", "null")
+        elif group:
             q = q.eq("group_name", group)
-        res = q.execute()
-        data = res.data
+            
         if search:
-            s = search.lower()
-            data = [c for c in data if
-                    s in (c.get("name") or "").lower() or
-                    s in (c.get("phone") or "") or
-                    s in (c.get("group_name") or "").lower()]
-        return data
+            # Search in name and phone. JSONB search is handled via ilike on the casted column if needed, 
+            # but for now we prioritize name/phone as per model.
+            q = q.or_(f"name.ilike.%{search}%,phone.ilike.%{search}%")
+            
+        offset = (page - 1) * per_page
+        q = q.order("created_at", desc=True).range(offset, offset + per_page - 1)
+        res   = q.execute()
+        total = res.count or 0
+        pages = max(1, -(-total // per_page))  # ceiling division
+        return {"contacts": res.data, "total": total, "page": page, "per_page": per_page, "pages": pages}
     except Exception as e:
         print(f"[ERROR] /api/contacts: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/contacts/groups")
+async def contacts_groups(user_id: str = Depends(get_current_user)):
+    try:
+        res = supabase.table("contacts").select("group_name").eq("user_id", user_id).not_.is_("group_name", "null").execute()
+        groups = sorted({r["group_name"] for r in res.data if r.get("group_name")})
+        return {"groups": groups}
+    except Exception as e:
+        print(f"[ERROR] /api/contacts/groups: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class BulkDeleteBody(BaseModel):
+    contact_ids: List[str]
+
+
+@app.post("/api/contacts/bulk-delete")
+async def contacts_bulk_delete(body: BulkDeleteBody, user_id: str = Depends(get_current_user)):
+    if not body.contact_ids:
+        return {"deleted": 0}
+    try:
+        supabase.table("contacts").delete().in_("id", body.contact_ids).eq("user_id", user_id).execute()
+    except Exception as e:
+        print(f"[ERROR] /api/contacts/bulk-delete: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"deleted": len(body.contact_ids)}
 
 
 @app.delete("/api/contacts/{contact_id}")
@@ -355,7 +454,11 @@ async def contacts_delete(contact_id: str, user_id: str = Depends(get_current_us
 
 
 @app.get("/api/contacts/whatsapp-contacts")
-async def whatsapp_contacts(user_id: str = Depends(get_current_user)):
+async def whatsapp_contacts(
+    save_to_contacts: bool = Query(False),
+    selected_phones: Optional[List[str]] = Query(None),
+    user_id: str = Depends(get_current_user)
+):
     # Step 1 — get instance from DB
     try:
         result = supabase.table("instances").select("*").eq("user_id", user_id).execute()
@@ -389,8 +492,15 @@ async def whatsapp_contacts(user_id: str = Depends(get_current_user)):
                 "error": f"Evolution API returned {res.status_code}: {res.text[:200]}"
             }
 
-        response_json = res.json()
-        raw_list = response_json if isinstance(response_json, list) else response_json.get("contacts", [])
+        # The evolution API can return a list or an object with a data/contacts key depending on version
+        resp_data = res.json()
+        if isinstance(resp_data, list):
+            raw_list = resp_data
+        elif isinstance(resp_data, dict):
+            raw_list = resp_data.get("contacts", resp_data.get("data", []))
+        else:
+            raw_list = []
+            
         print(f"[DEBUG] Total raw contacts returned: {len(raw_list)}")
 
         contacts = []
@@ -431,24 +541,37 @@ async def whatsapp_contacts(user_id: str = Depends(get_current_user)):
         contacts.sort(key=lambda c: (c["name"] is None, (c["name"] or "").lower()))
         print(f"[DEBUG] Valid contacts after filtering: {len(contacts)}")
 
-        # Save all valid contacts to the contacts table (upsert by phone per user)
+        saved = 0
+        already_existed = 0
         if contacts:
+            # Filter only selected ones if list provided
+            target_contacts = contacts
+            if selected_phones:
+                target_contacts = [c for c in contacts if c["phone"] in selected_phones]
+
             try:
-                existing_res = supabase.table("contacts").select("phone").eq("user_id", user_id).execute()
-                existing_phones = {r["phone"] for r in (existing_res.data or [])}
-                new_contacts = [
-                    {"user_id": user_id, "phone": c["phone"], "name": c["name"], "group_name": "WhatsApp"}
-                    for c in contacts if c["phone"] not in existing_phones
-                ]
-                if new_contacts:
+                existing_res = supabase.table("contacts").select("phone, id, name").eq("user_id", user_id).execute()
+                existing_map = {r["phone"]: r for r in (existing_res.data or [])}
+                new_contacts = []
+                for c in target_contacts:
+                    if c["phone"] not in existing_map:
+                        new_contacts.append({
+                            "user_id": user_id, "phone": c["phone"],
+                            "name": c["name"], "group_name": "WhatsApp Contacts", "custom_fields": {}
+                        })
+                    else:
+                        already_existed += 1
+                        # Update name if was null and we now have one
+                        if c["name"] and not existing_map[c["phone"]].get("name"):
+                            supabase.table("contacts").update({"name": c["name"]}).eq("id", existing_map[c["phone"]]["id"]).execute()
+                if new_contacts and save_to_contacts:
                     supabase.table("contacts").insert(new_contacts).execute()
-                    print(f"[DEBUG] Inserted {len(new_contacts)} new contacts into DB")
-                else:
-                    print(f"[DEBUG] No new contacts to insert (all already exist)")
+                    saved = len(new_contacts)
+                    print(f"[DEBUG] Inserted {saved} new contacts into DB")
             except Exception as e:
                 print(f"[ERROR] saving whatsapp contacts to DB: {e}")
 
-        return {"contacts": contacts, "total": len(contacts)}
+        return {"contacts": contacts, "total": len(contacts), "saved": saved, "already_existed": already_existed}
 
     except (httpx.ConnectError, httpx.TimeoutException) as e:
         print(f"[ERROR] /api/contacts/whatsapp-contacts unreachable: {e}")
@@ -481,9 +604,28 @@ async def get_stats(user_id: str = Depends(get_current_user)):
 
 # ── Campaigns ─────────────────────────────────────────────────────────────────
 
+def personalize_message(template: str, recipient: dict, global_name_default: str = "member") -> str:
+    message = template
+    # Replace {{name}}
+    name_val = recipient.get("name") or global_name_default
+    message = message.replace("{{name}}", str(name_val))
+    
+    # Replace all custom field tags
+    custom_fields = recipient.get("custom_fields") or {}
+    for key, value in custom_fields.items():
+        tag = f"{{{{{key}}}}}"
+        message = message.replace(tag, str(value) if value is not None else "")
+        
+    # Remove any unreplaced tags (field not present for this contact)
+    message = re.sub(r'\{\{[^}]+\}\}', '', message)
+    return message.strip()
+
+
 class Recipient(BaseModel):
-    phone: str
-    name:  Optional[str] = None
+    phone:         str
+    name:          Optional[str]  = None
+    custom_fields: Optional[dict] = {}
+    id:            Optional[str]  = None
 
 
 class CreateCampaignBody(BaseModel):
@@ -498,7 +640,7 @@ async def campaign_create(body: CreateCampaignBody, user_id: str = Depends(get_c
     for r in body.recipients:
         phone = format_phone(r.phone)
         if phone:
-            valid.append({"phone": phone, "name": r.name})
+            valid.append({"phone": phone, "name": r.name, "custom_fields": r.custom_fields or {}})
         else:
             rejected.append(r.phone)
 
@@ -519,11 +661,12 @@ async def campaign_create(body: CreateCampaignBody, user_id: str = Depends(get_c
         }).execute()
 
         rows = [{
-            "campaign_id": campaign_id,
-            "contact_id":  None,
-            "phone":       r["phone"],
-            "name":        r["name"],
-            "status":      "pending",
+            "campaign_id":   campaign_id,
+            "contact_id":    None,
+            "phone":         r["phone"],
+            "name":          r["name"],
+            "custom_fields": r["custom_fields"],
+            "status":        "pending",
         } for r in valid]
         supabase.table("campaign_recipients").insert(rows).execute()
     except Exception as e:
@@ -567,7 +710,7 @@ async def run_campaign(campaign_id: str, instance_name: str, message_template: s
 
         name         = r.get("name") or "member"
         phone        = r.get("phone", "")
-        personalized = message_template.replace("{{name}}", name)
+        personalized = personalize_message(message_template, r)
 
         async def attempt_send(msg=personalized, num=phone):
             return await http_client.post(

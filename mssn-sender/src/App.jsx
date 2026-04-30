@@ -8,29 +8,7 @@ import ProgressScreen from './screens/ProgressScreen.jsx'
 import ReportScreen from './screens/ReportScreen.jsx'
 import LandingScreen from './screens/LandingScreen.jsx'
 
-const STORAGE_TOKEN = 'mssn_token'
-const STORAGE_INSTANCE = 'mssn_instance'
-const STORAGE_USER = 'mssn_user'
-const API_BASE = 'https://api.zaicondigital.com'
-
-async function apiFetch(path, options = {}) {
-  const token = localStorage.getItem(STORAGE_TOKEN)
-  const isFormData = options.body instanceof FormData
-  const res = await fetch(API_BASE + path, {
-    ...options,
-    headers: {
-      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {})
-    }
-  })
-  if (res.status === 401 && !path.includes('/api/auth/')) {
-    localStorage.clear()
-    window.location.reload()
-    return
-  }
-  return res
-}
+import { apiFetch, API_BASE } from './api.js'
 
 export default function App() {
   const [screen, setScreen] = useState('loading')

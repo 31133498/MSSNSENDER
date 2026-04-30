@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Navbar from '../components/Navbar.jsx'
 import { Spinner } from '../components/Spinner.jsx'
+import { API_BASE } from '../api.js'
 
 const PAGE_SIZE = 50
 
@@ -53,7 +54,7 @@ export default function ContactsScreen({ onNavigate, apiFetch }) {
     const form = new FormData()
     form.append('file', csvFile)
     const token = localStorage.getItem('mssn_token')
-    const res = await fetch('https://api.zaicondigital.com/api/contacts/upload', {
+    const res = await fetch(API_BASE + '/api/contacts/upload', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: form
