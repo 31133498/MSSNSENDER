@@ -95,15 +95,15 @@ export default function CampaignScreen({ onNavigate, apiFetch, screenParams = {}
 
   const [recipients, setRecipients] = useState([])
   const [message, setMessage] = useState('')
-const [previewIndex, setPreviewIndex] = useState(0)
-  const [activeTab, setActiveTab] = useState('contacts')
-const [isSending, setIsSending] = useState(false)
+  const [previewIndex, setPreviewIndex] = useState(0)
+  const [activeTab, setActiveTab] = useState('paste')
+  const [isSending, setIsSending] = useState(false)
   const [sendError, setSendError] = useState('')
   const [confirm, setConfirm] = useState(null)
   const [manualModal, setManualModal] = useState(null)
   const [csvModalOpen, setCsvModalOpen] = useState(false)
 
-const [pasteText, setPasteText] = useState('')
+  const [pasteText, setPasteText] = useState('')
   const [parsedPaste, setParsedPaste] = useState([])
 
   const [contacts, setContacts] = useState([])
@@ -111,17 +111,8 @@ const [pasteText, setPasteText] = useState('')
   const [selectedGroup, setSelectedGroup] = useState(screenParams?.group || '')
   const [selectedGroupName, setSelectedGroupName] = useState(screenParams?.groupName || '')
   const [contactSearch, setContactSearch] = useState('')
-  const [groupSearch, setGroupSearch] = useState('')
   const [contactPage, setContactPage] = useState(1)
-
-  // Filter groups based on search text for searchable dropdown
-  const filteredGroups = useMemo(() => {
-    const q = groupSearch.trim().toLowerCase()
-    if (!q) return groups
-    return groups.filter(g => g.toLowerCase().includes(q))
-  }, [groups, groupSearch])
-
-const [contactsTotal, setContactsTotal] = useState(0)
+  const [contactsTotal, setContactsTotal] = useState(0)
   const [contactsLoading, setContactsLoading] = useState(false)
   const [groupSelecting, setGroupSelecting] = useState(false)
   const [showGroupPrompt, setShowGroupPrompt] = useState(false)
@@ -502,11 +493,11 @@ const [contactsTotal, setContactsTotal] = useState(0)
           </div>
           <div className="campaign-tabs">
             {[
+              ['paste', 'Paste Numbers'],
               ['contacts', 'From Contacts'],
               ['whatsapp', 'From WhatsApp'],
-              ['paste', 'Paste Numbers'],
-            ].map(([tabKey, label]) => (
-              <button key={tabKey} className={`campaign-tab${activeTab === tabKey ? ' active' : ''}`} onClick={() => setActiveTab(tabKey)}>
+            ].map(([key, label]) => (
+              <button key={key} className={`campaign-tab${activeTab === key ? ' active' : ''}`} onClick={() => setActiveTab(key)}>
                 {label}
               </button>
             ))}
@@ -535,30 +526,22 @@ const [contactsTotal, setContactsTotal] = useState(0)
           {activeTab === 'contacts' && (
             <div className="campaign-tab-panel">
               <div className="campaign-filter-grid">
-                <div className="group-search-wrap">
-                  <input
-                    className="input group-search-input"
-                    value={groupSearch}
-                    onChange={e => setGroupSearch(e.target.value)}
-                    placeholder="Search groups..."
-                  />
-                  <select
-                    className="input select-input"
-                    value={selectedGroup}
-                    onChange={e => {
-                      const group = e.target.value
-                      setSelectedGroup(group)
-                      setSelectedGroupName(group)
-                      setContactPage(1)
-                      setShowGroupPrompt(false)
-                      if (group) selectEntireGroup(group)
-                    }}
-                  >
-                    <option value="">All groups</option>
-                    <option value="__ungrouped__">Ungrouped</option>
-                    {filteredGroups.map(group => <option key={group} value={group}>{group}</option>)}
-                  </select>
-                </div>
+                <select
+                  className="input select-input"
+                  value={selectedGroup}
+                  onChange={e => {
+                    const group = e.target.value
+                    setSelectedGroup(group)
+                    setSelectedGroupName(group)
+                    setContactPage(1)
+                    setShowGroupPrompt(false)
+                    if (group) selectEntireGroup(group)
+                  }}
+                >
+                  <option value="">All groups</option>
+                  <option value="__ungrouped__">Ungrouped</option>
+                  {groups.map(group => <option key={group} value={group}>{group}</option>)}
+                </select>
                 <input
                   className="input"
                   value={contactSearch}

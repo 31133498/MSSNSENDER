@@ -41,8 +41,8 @@ export default function App() {
   if (screen === 'setup') return <SetupScreen {...props} isReconnect={false} />
   if (screen === 'reconnect') return <SetupScreen {...props} isReconnect={true} />
   if (screen === 'dashboard') return <DashboardScreen {...props} isConnected={isConnected} setIsConnected={setIsConnected} />
-  if (screen === 'contacts') return <ContactsScreen {...props} />
-  if (screen === 'campaign') return <CampaignScreen {...props} />
+  if (screen === 'contacts') return <ContactsScreen {...props} screenParams={screenParams} />
+  if (screen === 'campaign') return <CampaignScreen {...props} screenParams={screenParams} />
   if (screen === 'progress') return <ProgressScreen {...props} campaignId={screenParams.campaignId} />
   if (screen === 'report') return <ReportScreen {...props} campaignId={screenParams.campaignId} />
   return null
