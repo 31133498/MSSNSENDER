@@ -122,6 +122,9 @@ export default function CampaignScreen({ onNavigate, apiFetch, screenParams = {}
   const [contactsLoading, setContactsLoading] = useState(false)
   const [groupSelecting, setGroupSelecting] = useState(false)
   const [showGroupPrompt, setShowGroupPrompt] = useState(false)
+  const [loadingAllContacts, setLoadingAllContacts] = useState(false)
+  const [selectAllMessage, setSelectAllMessage] = useState('')
+  const [totalInGroup, setTotalInGroup] = useState(0)
 
   const [waContacts, setWaContacts] = useState([])
   const [waSearch, setWaSearch] = useState('')
@@ -269,6 +272,31 @@ export default function CampaignScreen({ onNavigate, apiFetch, screenParams = {}
       }
     } finally {
       setGroupSelecting(false)
+    }
+  }
+
+  async function handleSelectAllInGroup(group = selectedGroup) {
+    setLoadingAllContacts(true)
+    setSelectAllMessage('')
+    try {
+      const params = new URLSearchParams()
+      if (group) params.set('group', group)
+      if (contactSearch.trim()) params.set('search', contactSearch.trim())
+      const res = await apiFetch(`/api/contacts/all?${params}`)
+      if (!res || !res.ok) throw new Error('Failed to fetch contacts')
+      const data = await res.json()
+      const existingPhones = new Set(recipients.map(r => r.phone))
+      const newRecipients = (data.contacts || [])
+        .filter(c => !existingPhones.has(c.phone))
+        .map(c => contactRecipient(c, 'contacts'))
+      setRecipients(prev => [...prev, ...newRecipients])
+      const label = group ? `"${group}"` : 'all contacts'
+      setSelectAllMessage(`Added ${newRecipients.length} contacts from ${label}`)
+      setTimeout(() => setSelectAllMessage(''), 3000)
+    } catch (e) {
+      console.error('Failed to select all:', e)
+    } finally {
+      setLoadingAllContacts(false)
     }
   }
 
@@ -535,13 +563,18 @@ export default function CampaignScreen({ onNavigate, apiFetch, screenParams = {}
                 <select
                   className="input select-input"
                   value={selectedGroup}
-                  onChange={e => {
+                  onChange={async e => {
                     const group = e.target.value
                     setSelectedGroup(group)
                     setSelectedGroupName(group)
                     setContactPage(1)
                     setShowGroupPrompt(false)
-                    if (group) selectEntireGroup(group)
+                    setSelectAllMessage('')
+                    // Fetch total for banner
+                    const params = new URLSearchParams({ page: 1, per_page: 1 })
+                    if (group) params.set('group', group)
+                    const r = await apiFetch(`/api/contacts?${params}`)
+                    if (r && r.ok) { const d = await r.json(); setTotalInGroup(d.total || 0) }
                   }}
                 >
                   <option value="">All groups</option>
@@ -559,11 +592,15 @@ export default function CampaignScreen({ onNavigate, apiFetch, screenParams = {}
                 <button className="btn btn-sm btn-outline" onClick={() => addRecipients(contacts.map(c => contactRecipient(c, 'contacts')))}>Select All</button>
                 <button className="btn btn-sm btn-outline" onClick={() => deselectContacts(contacts)}>Deselect All</button>
                 <button className="btn btn-sm btn-danger" onClick={handleBulkDeleteSelectedContacts} disabled={selectedContactCount === 0}>Delete selected contacts</button>
-                {selectedGroup && (
-                  <button className="btn btn-sm btn-primary" onClick={() => selectEntireGroup()} disabled={groupSelecting}>
-                    {groupSelecting ? <><Spinner /> Selecting group...</> : 'Select entire group'}
+                {totalInGroup > 0 && (
+                <div className="select-all-banner">
+                  <span>{totalInGroup.toLocaleString()} contacts{selectedGroup ? ` in "${selectedGroup}"` : ' total'}</span>
+                  <button className="btn-select-all" onClick={() => handleSelectAllInGroup(selectedGroup)} disabled={loadingAllContacts}>
+                    {loadingAllContacts ? 'Loading...' : `Select all ${totalInGroup.toLocaleString()}`}
                   </button>
-                )}
+                </div>
+              )}
+              {selectAllMessage && <p className="select-success">{selectAllMessage}</p>}
                 <span>{selectedContactCount}/{contactsTotal} selected</span>
               </div>
               {groupSelecting && (

@@ -362,6 +362,29 @@ async def contacts_list(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/contacts/all")
+async def contacts_all(
+    group:   Optional[str] = Query(None),
+    search:  Optional[str] = Query(None),
+    user_id: str           = Depends(get_current_user),
+):
+    try:
+        q = supabase.table("contacts") \
+            .select("id,name,phone,group_name,custom_fields") \
+            .eq("user_id", user_id)
+        if group == "__ungrouped__":
+            q = q.is_("group_name", "null")
+        elif group:
+            q = q.eq("group_name", group)
+        if search:
+            q = q.or_(f"name.ilike.%{search}%,phone.ilike.%{search}%")
+        result = q.execute()
+        return {"contacts": result.data, "total": len(result.data)}
+    except Exception as e:
+        print(f"[ERROR] /api/contacts/all: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/contacts/groups")
 async def contacts_groups(user_id: str = Depends(get_current_user)):
     try:
@@ -779,6 +802,21 @@ class CreateCampaignBody(BaseModel):
     recipients:       List[Recipient]
 
 
+async def insert_recipients_batched(campaign_id: str, recipients: list):
+    batch_size = 100
+    for i in range(0, len(recipients), batch_size):
+        batch = recipients[i:i + batch_size]
+        rows = [{
+            "campaign_id":   campaign_id,
+            "contact_id":    None,
+            "phone":         r["phone"],
+            "name":          r.get("name"),
+            "custom_fields": r.get("custom_fields") or {},
+            "status":        "pending",
+        } for r in batch]
+        supabase.table("campaign_recipients").insert(rows).execute()
+
+
 @app.post("/api/campaigns/create")
 async def campaign_create(body: CreateCampaignBody, user_id: str = Depends(get_current_user)):
     valid, rejected = [], []
@@ -805,15 +843,7 @@ async def campaign_create(body: CreateCampaignBody, user_id: str = Depends(get_c
             "failed_count":     0,
         }).execute()
 
-        rows = [{
-            "campaign_id":   campaign_id,
-            "contact_id":    None,
-            "phone":         r["phone"],
-            "name":          r["name"],
-            "custom_fields": r["custom_fields"],
-            "status":        "pending",
-        } for r in valid]
-        supabase.table("campaign_recipients").insert(rows).execute()
+        await insert_recipients_batched(campaign_id, valid)
     except Exception as e:
         print(f"[ERROR] /api/campaigns/create: {e}")
         raise HTTPException(status_code=500, detail=str(e))
