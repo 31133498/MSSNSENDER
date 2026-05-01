@@ -70,16 +70,32 @@ app.add_middleware(
 
 def format_phone(raw: str) -> Optional[str]:
     digits = re.sub(r"\D", "", raw)
+    if not digits:
+        return None
+
+    # Already has country code (starts with 1-3 digit country code, total 7-15 digits)
+    # Nigerian: 234 + 10 digits = 13
     if digits.startswith("234") and len(digits) == 13:
         if digits[3] in ("7", "8", "9"):
             return digits
         return None
-    if len(digits) == 11 and digits[0] == "0":
-        if digits[1] in ("7", "8", "9"):
-            return "234" + digits[1:]
-        return None
+
+    # Nigerian local: 0 + 10 digits = 11
+    if len(digits) == 11 and digits[0] == "0" and digits[1] in ("7", "8", "9"):
+        return "234" + digits[1:]
+
+    # Nigerian 10-digit without leading 0
     if len(digits) == 10 and digits[0] in ("7", "8", "9"):
         return "234" + digits
+
+    # International: starts with + equivalent (already stripped by re.sub)
+    # Accept any number 7-15 digits that starts with a valid country code
+    # Country codes are 1-3 digits. Numbers with 7-15 digits total are valid E.164
+    if 7 <= len(digits) <= 15:
+        # If it doesn't start with 0, treat as already international
+        if digits[0] != "0":
+            return digits
+
     return None
 
 

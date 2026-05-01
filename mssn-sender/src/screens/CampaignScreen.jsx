@@ -9,9 +9,15 @@ const CONTACTS_PER_PAGE = 50
 
 function formatPhone(raw = '') {
   const digits = raw.replace(/\D/g, '')
-  if (digits.startsWith('234') && digits.length === 13 && ['7', '8', '9'].includes(digits[3])) return digits
-  if (digits.startsWith('0') && digits.length === 11 && ['7', '8', '9'].includes(digits[1])) return `234${digits.slice(1)}`
-  if (digits.length === 10 && ['7', '8', '9'].includes(digits[0])) return `234${digits}`
+  if (!digits) return null
+  // Nigerian: 234 + 10 digits
+  if (digits.startsWith('234') && digits.length === 13 && ['7','8','9'].includes(digits[3])) return digits
+  // Nigerian local: 0 + 10 digits
+  if (digits.startsWith('0') && digits.length === 11 && ['7','8','9'].includes(digits[1])) return '234' + digits.slice(1)
+  // Nigerian 10-digit
+  if (digits.length === 10 && ['7','8','9'].includes(digits[0])) return '234' + digits
+  // International: any 7-15 digit number not starting with 0
+  if (digits.length >= 7 && digits.length <= 15 && digits[0] !== '0') return digits
   return null
 }
 
@@ -510,13 +516,13 @@ export default function CampaignScreen({ onNavigate, apiFetch, screenParams = {}
                 rows="8"
                 value={pasteText}
                 onChange={e => setPasteText(e.target.value)}
-                placeholder={'Paste phone numbers here - one per line or comma separated.\n08012345678\n08098765432, 07011223344\n+2348055667788'}
+                placeholder={'Paste phone numbers here - one per line or comma separated.\n\nNigerian: 08012345678 or 2348012345678\nInternational: +447911123456 or 12025551234\nAny country with country code works.'}
               />
               <div className="paste-live-row">
                 <span className="paste-valid">{validPasteCount} valid numbers detected</span>
                 {invalidPasteCount > 0 && <span className="paste-invalid">{invalidPasteCount} invalid numbers ignored</span>}
               </div>
-              <p className="campaign-hint">Numbers automatically converted to international format (234XXXXXXXXXX)</p>
+              <p className="campaign-hint">Nigerian numbers auto-convert to 234XXXXXXXXXX. International numbers accepted with country code (e.g. +44, +1, +971).</p>
               <button className="btn btn-primary" onClick={addPastedNumbers} disabled={validPasteCount === 0}>
                 Add to recipients
               </button>
